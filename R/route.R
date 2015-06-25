@@ -80,7 +80,7 @@ route<-function (from, to,through, mode = c("driving", "walking", "bicycling"),
   destination <- paste("destination=", destination, sep = "")
   waypoints <- through
   waypoints <- gsub(" ", "+", waypoints)
-  waypoints <- paste("waypoints=", waypoints, sep = "|")
+  waypoints <- paste("waypoints=", waypoints, sep = "|",collapse='')
   
   mode4url <- paste("mode=", mode, sep = "")
   unit4url <- paste("units=", "metric", sep = "")
