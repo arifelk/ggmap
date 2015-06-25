@@ -99,6 +99,7 @@ route<-function (from, to,through, mode = c("driving", "walking", "bicycling"),
   posturl <- paste(origin, destination,waypoints, mode4url, unit4url, 
                    alts4url, sensor4url,client_id,version,channel, sep = "&")
   }
+  print(posturl)
   url_string <- paste("http://maps.googleapis.com/maps/api/directions/json?", 
                       posturl, sep = "")
   url_string <- URLencode(url_string)
