@@ -55,15 +55,16 @@
 #'
 #' }
 #'
-route <- function(from, to, mode = c("driving","walking","bicycling", "transit"),
-  structure = c("legs","route"), output = c("simple","all"), alternatives = FALSE,
-  messaging = FALSE, sensor = FALSE, override_limit = FALSE)
+route<-function (from, to,through, mode = c("driving", "walking", "bicycling"), 
+          structure = c("legs", "route"), output = c("simple", "all"),free=TRUE,key=NULL, client_id=NULL,channel=NULL,
+          alternatives = FALSE, messaging = FALSE, sensor = FALSE, version="3.20",
+          override_limit = FALSE) 
 {
-
-  # check parameters
-  if(is.numeric(from) && length(from) == 2) from <- revgeocode(from)
+  if (is.numeric(from) && length(from) == 2) 
+    from <- revgeocode(from)
   stopifnot(is.character(from))
-  if(is.numeric(to) && length(to) == 2) to <- revgeocode(to)
+  if (is.numeric(to) && length(to) == 2) 
+    to <- revgeocode(to)
   stopifnot(is.character(to))
   mode <- match.arg(mode)
   structure <- match.arg(structure)
@@ -71,80 +72,75 @@ route <- function(from, to, mode = c("driving","walking","bicycling", "transit")
   stopifnot(is.logical(alternatives))
   stopifnot(is.logical(messaging))
   stopifnot(is.logical(sensor))
-
-  # format url
   origin <- from
   origin <- gsub(" ", "+", origin)
   origin <- paste("origin=", origin, sep = "")
   destination <- to
   destination <- gsub(" ", "+", destination)
   destination <- paste("destination=", destination, sep = "")
+  waypoints <- through
+  waypoints <- gsub(" ", "+", waypoints)
+  destination <- paste("destination=", destination, sep = "|")
+  
   mode4url <- paste("mode=", mode, sep = "")
   unit4url <- paste("units=", "metric", sep = "")
-  alts4url <- paste("alternatives=", tolower(as.character(alternatives)), sep = "")
-  sensor4url <- paste("sensor=", tolower(as.character(sensor)), sep = "")
-  posturl <- paste(origin, destination, mode4url, unit4url, alts4url, sensor4url, sep = "&")
-  url_string <- paste("http://maps.googleapis.com/maps/api/directions/json?", posturl, sep = "")
+  alts4url <- paste("alternatives=", tolower(as.character(alternatives)), 
+                    sep = "")
+  version <- paste("v=",as.character(version),sep="")
+  sensor4url <- paste("sensor=", tolower(as.character(sensor)), 
+                      sep = "")
+  key=paste("key=",key,sep="")
+  client_id=paste("client_id=",client_id,sep="")
+  channel=paste("channel=",channel,sep="")
+  if (free){
+  posturl <- paste(origin, destination,waypoints, mode4url, unit4url, 
+                   alts4url, sensor4url, sep = "&")
+  } else{
+  posturl <- paste(origin, destination,waypoints, mode4url, unit4url, 
+                   alts4url, sensor4url,client_id,version,channel, sep = "&")
+  }
+  url_string <- paste("http://maps.googleapis.com/maps/api/directions/json?", 
+                      posturl, sep = "")
   url_string <- URLencode(url_string)
-
-  # check/update google query limit
-  check_route_query_limit(url_string, elems = 1,
-    override = override_limit, messaging = messaging)
-
-
-  # distance lookup
-  if(messaging) message("trying url ", url_string)
+  check_route_query_limit(url_string, elems = 1, override = override_limit, 
+                          messaging = messaging)
+  if (messaging) 
+    message("trying url ", url_string)
   connect <- url(url_string)
   tree <- fromJSON(paste(readLines(connect), collapse = ""))
   close(connect)
-
-  # return output = "all"
-  if(output == "all") return(tree)
-
-
-  # message user
+  if (output == "all") 
+    return(tree)
   message(paste0("Information from URL : ", url_string))
-
-
-  # extract output from tree and format
-  out <- ldply(tree$routes, function(route){
-
-    route_df <- ldply(route$legs[[1]]$steps, function(oneLegList){
-      data.frame(
-        m        = oneLegList$distance$value,
-        km       = oneLegList$distance$value/1000,
-        miles    = 0.0006214 * oneLegList$distance$value,
-        seconds  = oneLegList$duration$value,
-        minutes  = oneLegList$duration$value / 60,
-  	    hours    = oneLegList$duration$value / 3600,
-  	    startLon = oneLegList$start_location$lng,
-  	    startLat = oneLegList$start_location$lat,
-  	    endLon   = oneLegList$end_location$lng,
-  	    endLat   = oneLegList$end_location$lat
-      )
+  message("Google Maps API Terms of Service : http://developers.google.com/maps/terms")
+  out <- ldply(tree$routes, function(route) {
+    route_df <- ldply(route$legs[[1]]$steps, function(oneLegList) {
+      data.frame(m = oneLegList$distance$value, km = oneLegList$distance$value/1000, 
+                 miles = 0.0006214 * oneLegList$distance$value, 
+                 seconds = oneLegList$duration$value, minutes = oneLegList$duration$value/60, 
+                 hours = oneLegList$duration$value/3600, startLon = oneLegList$start_location$lng, 
+                 startLat = oneLegList$start_location$lat, endLon = oneLegList$end_location$lng, 
+                 endLat = oneLegList$end_location$lat)
     })
     route_df$leg <- 1:nrow(route_df)
     route_df
   })
-
-  # label routes
-  stepsPerRoute <-
-    sapply(tree$routes, function(route) length(route$legs[[1]]$steps))
-
+  stepsPerRoute <- sapply(tree$routes, function(route) length(route$legs[[1]]$steps))
   nRoutes <- length(stepsPerRoute)
   routeLabel <- NULL
-  for(k in 1:nRoutes){
+  for (k in 1:nRoutes) {
     routeLabel <- c(routeLabel, rep(LETTERS[k], stepsPerRoute[k]))
   }
-  if(nRoutes > 1) out$route <- routeLabel
-
-  # return output = "simple"
-  if(structure == "legs"){
+  if (nRoutes > 1) 
+    out$route <- routeLabel
+  if (structure == "legs") {
     return(out)
-  } else {
-  	return(legs2route(out))
+  }
+  else {
+    return(legs2route(out))
   }
 }
+
 
 
 
